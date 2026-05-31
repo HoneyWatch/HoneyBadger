@@ -11,136 +11,106 @@
     tick: "#8a8a93",
   };
 
-  const ISO2_TO_ISO3 = {
-    CN: "CHN",
-    US: "USA",
-    RU: "RUS",
-    BR: "BRA",
-    DE: "DEU",
-    IN: "IND",
-    NL: "NLD",
-    FR: "FRA",
-    GB: "GBR",
-    SG: "SGP",
-    KR: "KOR",
-    VN: "VNM",
-    ID: "IDN",
-    UA: "UKR",
-    CA: "CAN",
-  };
-
   const getJSON = (url) => fetch(url).then((r) => r.json());
 
   Chart.defaults.color = COLORS.tick;
   Chart.defaults.font.family = "Inter, Segoe UI, system-ui, sans-serif";
   Chart.defaults.font.size = 11;
 
-  /* ---------- Map (static SVG world, per-country attack counts) ---------- */
+  /* ---------- Map (Chart.js geo — lightweight bubble map, no tiles) ---------- */
+  let geoFeatures = null;
+  let attackMap = null;
+
   function setMapInfo(name, count) {
     const el = document.getElementById("map-info");
     if (!el) return;
     if (!name) {
-      el.textContent = "Hover or click a country to see attack count";
+      el.textContent = "Hover an attack source for details";
       return;
     }
-    const formatted = count.toLocaleString();
     el.innerHTML =
       `<strong>${name}</strong> — ` +
-      `<span class="map-info-count">${formatted}</span> attack${count === 1 ? "" : "s"}`;
+      `<span class="map-info-count">${count.toLocaleString()}</span> attack${count === 1 ? "" : "s"}`;
+  }
+
+  function loadCountries() {
+    if (geoFeatures) return Promise.resolve(geoFeatures);
+    return getJSON("/static/vendor/countries-110m.json").then((topo) => {
+      geoFeatures = ChartGeo.topojson.feature(
+        topo,
+        topo.objects.countries
+      ).features;
+      return geoFeatures;
+    });
   }
 
   function initMap(points) {
-    const container = document.getElementById("attack-map");
-    if (!container || typeof d3 === "undefined") return;
+    const canvas = document.getElementById("attack-map");
+    if (!canvas) return;
 
-    const geoUrl = container.dataset.geoUrl;
-    if (!geoUrl) return;
+    if (typeof ChartGeo === "undefined") {
+      const box = canvas.parentElement;
+      if (box) {
+        box.innerHTML =
+          '<p class="map-error">Map plugin missing. Restart <code>python -m dashboard.app</code> and Ctrl+F5.</p>';
+      }
+      return;
+    }
 
-    const byCode = Object.fromEntries(
-      points.map((p) => {
-        const iso2 = p.code.toUpperCase();
-        const iso3 = ISO2_TO_ISO3[iso2] || iso2;
-        return [iso3, { name: p.name, count: p.count }];
-      })
-    );
+    const valid = points.filter((p) => p.lat != null && p.lng != null);
 
-    const width = container.clientWidth || 640;
-    const height = 320;
-
-    const svg = d3
-      .select(container)
-      .append("svg")
-      .attr("width", "100%")
-      .attr("height", "100%")
-      .attr("viewBox", `0 0 ${width} ${height}`)
-      .attr("preserveAspectRatio", "xMidYMid meet");
-
-    const projection = d3.geoNaturalEarth1().precision(0.1);
-    const path = d3.geoPath().projection(projection);
-
-    d3.json(geoUrl).then((geo) => {
-      if (!geo?.features) return;
-
-      projection.fitExtent(
-        [[2, 2], [width - 2, height - 2]],
-        { type: "FeatureCollection", features: geo.features }
-      );
-
-      svg
-        .append("rect")
-        .attr("width", width)
-        .attr("height", height)
-        .attr("fill", "#c8dce8");
-
-      const layer = svg.append("g").attr("class", "countries");
-
-      let selected = null;
-
-      const countries = layer
-        .selectAll("path.country")
-        .data(geo.features)
-        .join("path")
-        .attr("class", (d) => {
-          const iso3 = (d.id || "").toUpperCase();
-          return byCode[iso3] ? "country has-data" : "country";
-        })
-        .attr("d", path)
-        .on("mouseenter", function (_event, d) {
-          const iso3 = (d.id || "").toUpperCase();
-          const entry = byCode[iso3];
-          const name = entry?.name || d.properties?.name || "Unknown";
-          const count = entry?.count ?? 0;
-          setMapInfo(name, count);
-          d3.select(this).classed("is-hover", true);
-        })
-        .on("mouseleave", function () {
-          d3.select(this).classed("is-hover", false);
-          if (!selected) setMapInfo(null, 0);
-          else {
-            const iso3 = (selected.id || "").toUpperCase();
-            const entry = byCode[iso3];
-            setMapInfo(
-              entry?.name || selected.properties?.name,
-              entry?.count ?? 0
-            );
-          }
-        })
-        .on("click", function (_event, d) {
-          countries.classed("is-selected", false);
-          if (selected === d) {
-            selected = null;
-            setMapInfo(null, 0);
-            return;
-          }
-          selected = d;
-          d3.select(this).classed("is-selected", true);
-          const iso3 = (d.id || "").toUpperCase();
-          const entry = byCode[iso3];
-          setMapInfo(
-            entry?.name || d.properties?.name || "Unknown",
-            entry?.count ?? 0
-          );
-        });
+    loadCountries().then((countries) => {
+      if (attackMap) attackMap.destroy();
+      attackMap = new Chart(canvas.getContext("2d"), {
+        type: "bubbleMap",
+        data: {
+          labels: valid.map((p) => p.name),
+          datasets: [
+            {
+              outline: countries,
+              showOutline: true,
+              outlineBackgroundColor: "rgba(255,255,255,0.035)",
+              outlineBorderColor: "rgba(255,255,255,0.14)",
+              outlineBorderWidth: 0.5,
+              backgroundColor: "rgba(245,158,11,0.75)",
+              borderColor: "#fde68a",
+              borderWidth: 1,
+              hoverBackgroundColor: "#f59e0b",
+              data: valid.map((p) => ({
+                x: p.lng,
+                y: p.lat,
+                value: p.count,
+                name: p.name,
+              })),
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onHover: (_evt, els) => {
+            if (els.length) {
+              const d = valid[els[0].index];
+              setMapInfo(d.name, d.count);
+            } else {
+              setMapInfo(null, 0);
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (c) =>
+                  `${c.raw.name}: ${Number(c.raw.value).toLocaleString()} attacks`,
+              },
+            },
+          },
+          scales: {
+            projection: { axis: "x", projection: "equalEarth" },
+            size: { axis: "x", size: [4, 26] },
+          },
+        },
+      });
     });
   }
 

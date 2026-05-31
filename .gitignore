@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Honeypot database (downloaded from VPS, can be large)
+*.db
+honeywatch.db
+
+# Runtime geolocation cache (regenerated on demand)
+data/geo_cache.json
+
+# Environment / secrets
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+* text=auto eol=lf

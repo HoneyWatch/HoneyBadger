@@ -42,21 +42,21 @@ def get_top_countries() -> list[dict]:
 
 # Approximate capital/centroid coordinates for the map markers.
 _GEO = [
-    {"name": "China", "code": "CN", "lat": 39.9, "lng": 116.4, "count": 4523},
-    {"name": "United States", "code": "US", "lat": 38.9, "lng": -77.0, "count": 2654},
-    {"name": "Russia", "code": "RU", "lat": 55.75, "lng": 37.6, "count": 1253},
-    {"name": "Brazil", "code": "BR", "lat": -15.8, "lng": -47.9, "count": 821},
-    {"name": "Germany", "code": "DE", "lat": 52.5, "lng": 13.4, "count": 512},
-    {"name": "India", "code": "IN", "lat": 28.6, "lng": 77.2, "count": 498},
-    {"name": "Netherlands", "code": "NL", "lat": 52.4, "lng": 4.9, "count": 394},
-    {"name": "France", "code": "FR", "lat": 48.85, "lng": 2.35, "count": 311},
-    {"name": "United Kingdom", "code": "GB", "lat": 51.5, "lng": -0.13, "count": 277},
-    {"name": "Singapore", "code": "SG", "lat": 1.35, "lng": 103.8, "count": 240},
-    {"name": "South Korea", "code": "KR", "lat": 37.57, "lng": 126.98, "count": 221},
-    {"name": "Vietnam", "code": "VN", "lat": 21.03, "lng": 105.85, "count": 205},
-    {"name": "Indonesia", "code": "ID", "lat": -6.2, "lng": 106.85, "count": 198},
-    {"name": "Ukraine", "code": "UA", "lat": 50.45, "lng": 30.52, "count": 176},
-    {"name": "Canada", "code": "CA", "lat": 45.42, "lng": -75.7, "count": 162},
+    {"name": "China", "code": "CN", "iso3": "CHN", "lat": 39.9, "lng": 116.4, "count": 4523},
+    {"name": "United States", "code": "US", "iso3": "USA", "lat": 38.9, "lng": -77.0, "count": 2654},
+    {"name": "Russia", "code": "RU", "iso3": "RUS", "lat": 55.75, "lng": 37.6, "count": 1253},
+    {"name": "Brazil", "code": "BR", "iso3": "BRA", "lat": -15.8, "lng": -47.9, "count": 821},
+    {"name": "Germany", "code": "DE", "iso3": "DEU", "lat": 52.5, "lng": 13.4, "count": 512},
+    {"name": "India", "code": "IN", "iso3": "IND", "lat": 28.6, "lng": 77.2, "count": 498},
+    {"name": "Netherlands", "code": "NL", "iso3": "NLD", "lat": 52.4, "lng": 4.9, "count": 394},
+    {"name": "France", "code": "FR", "iso3": "FRA", "lat": 48.85, "lng": 2.35, "count": 311},
+    {"name": "United Kingdom", "code": "GB", "iso3": "GBR", "lat": 51.5, "lng": -0.13, "count": 277},
+    {"name": "Singapore", "code": "SG", "iso3": "SGP", "lat": 1.35, "lng": 103.8, "count": 240},
+    {"name": "South Korea", "code": "KR", "iso3": "KOR", "lat": 37.57, "lng": 126.98, "count": 221},
+    {"name": "Vietnam", "code": "VN", "iso3": "VNM", "lat": 21.03, "lng": 105.85, "count": 205},
+    {"name": "Indonesia", "code": "ID", "iso3": "IDN", "lat": -6.2, "lng": 106.85, "count": 198},
+    {"name": "Ukraine", "code": "UA", "iso3": "UKR", "lat": 50.45, "lng": 30.52, "count": 176},
+    {"name": "Canada", "code": "CA", "iso3": "CAN", "lat": 45.42, "lng": -75.7, "count": 162},
 ]
 
 

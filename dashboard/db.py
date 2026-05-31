@@ -22,17 +22,19 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from . import geoip
+from .iso_codes import to_iso3
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
 
 
 def _resolve_db_path() -> str:
-    """Locate the honeypot DB: env var, then project root, then Desktop."""
+    """Locate the honeypot DB: env var, VPS path, project root, then Desktop."""
     env = os.environ.get("HONEYWATCH_DB")
     if env:
         return env
     candidates = [
+        "/opt/honeywatch/honeywatch.db",
         os.path.join(_ROOT, "honeywatch.db"),
         os.path.join(os.path.expanduser("~"), "Desktop", "honeywatch.db"),
     ]
@@ -127,6 +129,7 @@ def _country_aggregate(conn: sqlite3.Connection) -> list[dict]:
             {
                 "name": info["country"],
                 "code": code,
+                "iso3": to_iso3(code),
                 "flag": geoip.flag(code),
                 "lat": info["lat"],
                 "lng": info["lng"],
@@ -198,6 +201,7 @@ def get_geo() -> list[dict]:
         {
             "name": e["name"],
             "code": e["code"],
+            "iso3": e.get("iso3") or to_iso3(e["code"]),
             "lat": e["lat"],
             "lng": e["lng"],
             "count": e["count"],
