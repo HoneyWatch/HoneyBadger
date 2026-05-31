@@ -11,57 +11,136 @@
     tick: "#8a8a93",
   };
 
+  const ISO2_TO_ISO3 = {
+    CN: "CHN",
+    US: "USA",
+    RU: "RUS",
+    BR: "BRA",
+    DE: "DEU",
+    IN: "IND",
+    NL: "NLD",
+    FR: "FRA",
+    GB: "GBR",
+    SG: "SGP",
+    KR: "KOR",
+    VN: "VNM",
+    ID: "IDN",
+    UA: "UKR",
+    CA: "CAN",
+  };
+
   const getJSON = (url) => fetch(url).then((r) => r.json());
 
   Chart.defaults.color = COLORS.tick;
   Chart.defaults.font.family = "Inter, Segoe UI, system-ui, sans-serif";
   Chart.defaults.font.size = 11;
 
-  /* ---------- Map ---------- */
-  function initMap(points) {
-    const map = L.map("attack-map", {
-      attributionControl: true,
-      worldCopyJump: true,
-      minZoom: 1,
-      zoomControl: true,
-    }).setView([25, 10], 1.6);
-
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {
-        attribution: "&copy; OpenStreetMap &copy; CARTO",
-        subdomains: "abcd",
-        maxZoom: 19,
-      }
-    ).addTo(map);
-
-    const max = Math.max(...points.map((p) => p.count));
-
-    // Heat overlay for the glow effect.
-    if (L.heatLayer) {
-      const heat = points.map((p) => [p.lat, p.lng, p.count / max]);
-      L.heatLayer(heat, {
-        radius: 28,
-        blur: 22,
-        maxZoom: 6,
-        gradient: { 0.2: "#7c2d12", 0.5: "#ea7c1f", 1.0: "#f59e0b" },
-      }).addTo(map);
+  /* ---------- Map (static SVG world, per-country attack counts) ---------- */
+  function setMapInfo(name, count) {
+    const el = document.getElementById("map-info");
+    if (!el) return;
+    if (!name) {
+      el.textContent = "Hover or click a country to see attack count";
+      return;
     }
+    const formatted = count.toLocaleString();
+    el.innerHTML =
+      `<strong>${name}</strong> — ` +
+      `<span class="map-info-count">${formatted}</span> attack${count === 1 ? "" : "s"}`;
+  }
 
-    points.forEach((p) => {
-      const r = 4 + (p.count / max) * 14;
-      L.circleMarker([p.lat, p.lng], {
-        radius: r,
-        color: COLORS.accent,
-        weight: 1,
-        fillColor: COLORS.accent,
-        fillOpacity: 0.55,
+  function initMap(points) {
+    const container = document.getElementById("attack-map");
+    if (!container || typeof d3 === "undefined") return;
+
+    const geoUrl = container.dataset.geoUrl;
+    if (!geoUrl) return;
+
+    const byCode = Object.fromEntries(
+      points.map((p) => {
+        const iso2 = p.code.toUpperCase();
+        const iso3 = ISO2_TO_ISO3[iso2] || iso2;
+        return [iso3, { name: p.name, count: p.count }];
       })
-        .bindTooltip(
-          `<strong>${p.name}</strong><br>${p.count.toLocaleString()} attacks`,
-          { direction: "top" }
-        )
-        .addTo(map);
+    );
+
+    const width = container.clientWidth || 640;
+    const height = 320;
+
+    const svg = d3
+      .select(container)
+      .append("svg")
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("preserveAspectRatio", "xMidYMid meet");
+
+    const projection = d3.geoNaturalEarth1().precision(0.1);
+    const path = d3.geoPath().projection(projection);
+
+    d3.json(geoUrl).then((geo) => {
+      if (!geo?.features) return;
+
+      projection.fitExtent(
+        [[2, 2], [width - 2, height - 2]],
+        { type: "FeatureCollection", features: geo.features }
+      );
+
+      svg
+        .append("rect")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("fill", "#c8dce8");
+
+      const layer = svg.append("g").attr("class", "countries");
+
+      let selected = null;
+
+      const countries = layer
+        .selectAll("path.country")
+        .data(geo.features)
+        .join("path")
+        .attr("class", (d) => {
+          const iso3 = (d.id || "").toUpperCase();
+          return byCode[iso3] ? "country has-data" : "country";
+        })
+        .attr("d", path)
+        .on("mouseenter", function (_event, d) {
+          const iso3 = (d.id || "").toUpperCase();
+          const entry = byCode[iso3];
+          const name = entry?.name || d.properties?.name || "Unknown";
+          const count = entry?.count ?? 0;
+          setMapInfo(name, count);
+          d3.select(this).classed("is-hover", true);
+        })
+        .on("mouseleave", function () {
+          d3.select(this).classed("is-hover", false);
+          if (!selected) setMapInfo(null, 0);
+          else {
+            const iso3 = (selected.id || "").toUpperCase();
+            const entry = byCode[iso3];
+            setMapInfo(
+              entry?.name || selected.properties?.name,
+              entry?.count ?? 0
+            );
+          }
+        })
+        .on("click", function (_event, d) {
+          countries.classed("is-selected", false);
+          if (selected === d) {
+            selected = null;
+            setMapInfo(null, 0);
+            return;
+          }
+          selected = d;
+          d3.select(this).classed("is-selected", true);
+          const iso3 = (d.id || "").toUpperCase();
+          const entry = byCode[iso3];
+          setMapInfo(
+            entry?.name || d.properties?.name || "Unknown",
+            entry?.count ?? 0
+          );
+        });
     });
   }
 

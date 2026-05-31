@@ -113,7 +113,34 @@ html, body {
 /* Map row */
 .map-row { display: grid; grid-template-columns: 1fr 280px; gap: 16px; }
 .map-card { padding-bottom: 16px; }
-#attack-map { height: 320px; border-radius: 10px; overflow: hidden; background: #0c1118; }
+.map-info {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 1.25em;
+}
+.map-info strong { color: var(--text); font-weight: 600; }
+.map-info .map-info-count { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+#attack-map {
+  height: 320px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #c8dce8;
+  cursor: default;
+}
+#attack-map svg { display: block; width: 100%; height: 100%; }
+#attack-map .country {
+  fill: #ffffff;
+  stroke: #1a1a1a;
+  stroke-width: 0.35px;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.12s ease;
+}
+#attack-map .country.has-data { cursor: pointer; }
+#attack-map .country.is-hover { fill: #f3f4f6; }
+#attack-map .country.has-data.is-hover { fill: #fde8c8; }
+#attack-map .country.is-selected { fill: #fcd9a0; stroke-width: 0.6px; }
 
 .countries-card { display: flex; flex-direction: column; }
 .country-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
