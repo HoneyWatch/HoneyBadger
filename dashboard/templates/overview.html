@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}HoneyWatch — Overview{% endblock %}
+{% block page_title %}OVERVIEW{% endblock %}
+
+{% macro delta(d) %}
+<span class="kpi-delta {{ 'up' if d >= 0 else 'down' }}">
+  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    {% if d >= 0 %}<polyline points="6 14 12 8 18 14"/>{% else %}<polyline points="6 10 12 16 18 10"/>{% endif %}
+  </svg>
+  {{ '%+.1f'|format(d) }}% (24h)
+</span>
+{% endmacro %}
+
+{% block content %}
+<section class="kpi-grid">
+  <div class="card kpi">
+    <div class="kpi-label">TOTAL ATTACKS</div>
+    <div class="kpi-value">{{ '{:,}'.format(summary.total_attacks.value) }}</div>
+    {{ delta(summary.total_attacks.delta_24h) }}
+  </div>
+  <div class="card kpi">
+    <div class="kpi-label">UNIQUE IP ADDRESSES</div>
+    <div class="kpi-value">{{ '{:,}'.format(summary.unique_ips.value) }}</div>
+    {{ delta(summary.unique_ips.delta_24h) }}
+  </div>
+  <div class="card kpi">
+    <div class="kpi-label">LOGIN ATTEMPTS</div>
+    <div class="kpi-value">{{ '{:,}'.format(summary.login_attempts.value) }}</div>
+    {{ delta(summary.login_attempts.delta_24h) }}
+  </div>
+  <div class="card kpi">
+    <div class="kpi-label">COUNTRIES</div>
+    <div class="kpi-value">{{ summary.countries.value }}</div>
+    {{ delta(summary.countries.delta_24h) }}
+  </div>
+</section>
+
+<section class="map-row">
+  <div class="card map-card">
+    <div class="card-head"><span class="card-title">ATTACKS BY LOCATION</span></div>
+    <div id="attack-map"></div>
+  </div>
+  <div class="card countries-card">
+    <div class="card-head"><span class="card-title">TOP COUNTRIES</span></div>
+    <ul class="country-list">
+      {% for c in top_countries %}
+      <li class="country-row">
+        <span class="country-flag">{{ c.flag }}</span>
+        <span class="country-name">{{ c.name }}</span>
+        <span class="country-count">{{ '{:,}'.format(c.count) }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="charts-row">
+  <div class="card">
+    <div class="card-head"><span class="card-title">ATTACKS OVER TIME</span></div>
+    <div class="chart-box"><canvas id="timeline-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">TOP USERNAMES</span></div>
+    <div class="chart-box"><canvas id="usernames-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">TOP PASSWORDS</span></div>
+    <div class="chart-box"><canvas id="passwords-chart"></canvas></div>
+  </div>
+</section>
+
+<section class="bottom-row">
+  <div class="card">
+    <div class="card-head"><span class="card-title">ATTACKS TYPES</span></div>
+    <div class="donut-wrap">
+      <div class="donut-box"><canvas id="types-chart"></canvas></div>
+      <ul class="donut-legend" id="types-legend"></ul>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">ATTACKS BY HOUR (HEATMAP)</span></div>
+    <div id="heatmap" class="heatmap"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">RECENT ATTACKS</span></div>
+    <ul class="recent-list">
+      {% for r in recent %}
+      <li class="recent-row">
+        <span class="recent-flag">{{ r.flag }}</span>
+        <span class="recent-ip">{{ r.ip }}</span>
+        <span class="recent-type">{{ r.type }}</span>
+        <span class="recent-time">{{ r.time }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

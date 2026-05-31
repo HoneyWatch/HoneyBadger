@@ -1,0 +1,33 @@
+{% set nav_items = [
+  ("overview", "Overview", "grid"),
+  ("attacks", "Attacks", "alert"),
+  ("map", "Map", "map"),
+  ("statistics", "Statistics", "chart"),
+  ("logs", "Logs", "list"),
+  ("credentials", "Top Credentials", "key"),
+  ("hosts", "Hosts", "server"),
+  ("settings", "Settings", "gear"),
+] %}
+<aside class="sidebar">
+  <div class="brand">
+    <span class="brand-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none">
+        <path d="M12 2l8.66 5v10L12 22l-8.66-5V7L12 2z" stroke="#f59e0b" stroke-width="1.5" fill="rgba(245,158,11,0.08)"/>
+        <ellipse cx="12" cy="12" rx="3" ry="4" fill="#f59e0b"/>
+        <path d="M12 8.2c-1.6 0-2.9 1.7-2.9 3.8S10.4 15.8 12 15.8 14.9 14.1 14.9 12 13.6 8.2 12 8.2z" fill="#111"/>
+        <rect x="9.4" y="10.4" width="5.2" height="0.9" rx="0.4" fill="#f59e0b"/>
+        <rect x="9.4" y="12.2" width="5.2" height="0.9" rx="0.4" fill="#f59e0b"/>
+        <path d="M9 7.5c-1.6-1.1-3-1-3-1s.6 1.4 2.3 2.2M15 7.5c1.6-1.1 3-1 3-1s-.6 1.4-2.3 2.2" stroke="#f59e0b" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+    </span>
+  </div>
+
+  <nav class="nav">
+    {% for key, label, icon in nav_items %}
+    <a class="nav-item {{ 'active' if active_page == key else '' }}" href="#">
+      <span class="nav-icon">{% include "_icons.html" %}</span>
+      <span class="nav-label">{{ label }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+</aside>
