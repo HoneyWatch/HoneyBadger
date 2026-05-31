@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}HoneyWatch{% endblock %}</title>
 
-  <!-- Chart.js + geo plugin (bubble map) -->
+  <!-- Chart.js (charts) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="{{ url_for('static', filename='vendor/chartjs-chart-geo.umd.min.js') }}"></script>
+
+  {% block map_assets %}{% endblock %}
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
 </head>
