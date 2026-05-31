@@ -57,9 +57,58 @@ _DEFAULT_EVENT = ("Other", "#3b82f6")
 
 _DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+_RANGES = {
+    "1h": {
+        "period": "1 hour",
+        "prev_start": "2 hours",
+        "prev_end": "1 hour",
+        "timeline_minutes": 60,
+        "delta_label": "1h",
+        "display": "Last hour",
+    },
+    "24h": {
+        "period": "1 day",
+        "prev_start": "2 days",
+        "prev_end": "1 day",
+        "timeline_hours": 24,
+        "delta_label": "24h",
+        "display": "Last 24 hours",
+    },
+    "week": {
+        "period": "7 days",
+        "prev_start": "14 days",
+        "prev_end": "7 days",
+        "timeline_days": 7,
+        "delta_label": "7d",
+        "display": "Last 7 days",
+    },
+    "month": {
+        "period": "30 days",
+        "prev_start": "60 days",
+        "prev_end": "30 days",
+        "timeline_days": 30,
+        "delta_label": "30d",
+        "display": "Last 30 days",
+    },
+}
 
-def available() -> bool:
-    return os.path.exists(DB_PATH)
+
+def normalize_range(range_key: str | None) -> str:
+    key = (range_key or "24h").strip().lower()
+    return key if key in _RANGES else "24h"
+
+
+def range_delta_label(range_key: str | None) -> str:
+    return _RANGES[normalize_range(range_key)]["delta_label"]
+
+
+def range_display_label(range_key: str | None) -> str:
+    return _RANGES[normalize_range(range_key)]["display"]
+
+
+def _window_sql(mod: str, range_key: str) -> str:
+    period = _RANGES[normalize_range(range_key)]["period"]
+    return f"datetime(timestamp{mod}) >= datetime('now','-{period}')"
 
 
 def _connect() -> sqlite3.Connection:
@@ -87,17 +136,34 @@ def _ts_mod(conn: sqlite3.Connection) -> str:
     return ""
 
 
-def _delta(conn: sqlite3.Connection, mod: str, where: str = "") -> tuple[int, float]:
-    """Count rows in the last 24h and the % change vs the previous 24h."""
+def _anchor(conn: sqlite3.Connection, mod: str) -> datetime:
+    max_ts = conn.execute(
+        f"SELECT MAX(datetime(timestamp{mod})) FROM attacks"
+    ).fetchone()[0]
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    anchor = now
+    if max_ts:
+        try:
+            anchor = max(now, datetime.strptime(max_ts, "%Y-%m-%d %H:%M:%S"))
+        except ValueError:
+            pass
+    return anchor
+
+
+def _delta(
+    conn: sqlite3.Connection, mod: str, range_key: str, where: str = ""
+) -> tuple[int, float]:
+    """Count rows in the selected window and % change vs the previous window."""
+    cfg = _RANGES[normalize_range(range_key)]
     clause = f" AND {where}" if where else ""
     last = conn.execute(
         f"SELECT COUNT(*) FROM attacks "
-        f"WHERE datetime(timestamp{mod}) >= datetime('now','-1 day'){clause}"
+        f"WHERE datetime(timestamp{mod}) >= datetime('now','-{cfg['period']}'){clause}"
     ).fetchone()[0]
     prev = conn.execute(
         f"SELECT COUNT(*) FROM attacks "
-        f"WHERE datetime(timestamp{mod}) >= datetime('now','-2 day') "
-        f"AND datetime(timestamp{mod}) < datetime('now','-1 day'){clause}"
+        f"WHERE datetime(timestamp{mod}) >= datetime('now','-{cfg['prev_start']}') "
+        f"AND datetime(timestamp{mod}) < datetime('now','-{cfg['prev_end']}'){clause}"
     ).fetchone()[0]
     if prev:
         pct = round((last - prev) / prev * 100, 1)
@@ -106,17 +172,19 @@ def _delta(conn: sqlite3.Connection, mod: str, where: str = "") -> tuple[int, fl
     return last, pct
 
 
-def _ip_counts(conn: sqlite3.Connection) -> list[tuple[str, int]]:
+def _ip_counts(conn: sqlite3.Connection, range_key: str) -> list[tuple[str, int]]:
+    mod = _ts_mod(conn)
+    window = _window_sql(mod, range_key)
     rows = conn.execute(
-        "SELECT src_ip, COUNT(*) AS c FROM attacks "
-        "WHERE src_ip IS NOT NULL GROUP BY src_ip"
+        f"SELECT src_ip, COUNT(*) AS c FROM attacks "
+        f"WHERE src_ip IS NOT NULL AND {window} GROUP BY src_ip"
     ).fetchall()
     return [(r["src_ip"], r["c"]) for r in rows]
 
 
-def _country_aggregate(conn: sqlite3.Connection) -> list[dict]:
+def _country_aggregate(conn: sqlite3.Connection, range_key: str) -> list[dict]:
     """Aggregate attack counts by geolocated country."""
-    ip_counts = _ip_counts(conn)
+    ip_counts = _ip_counts(conn, range_key)
     geo = geoip.locate([ip for ip, _ in ip_counts])
     agg: dict[str, dict] = {}
     for ip, count in ip_counts:
@@ -141,34 +209,36 @@ def _country_aggregate(conn: sqlite3.Connection) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- #
-# Public API (mirrors mock_data signatures)                                   #
+# Public API                                                                #
 # --------------------------------------------------------------------------- #
-def get_summary() -> dict:
+def get_summary(period: str = "24h") -> dict:
+    range_key = normalize_range(period)
+    cfg = _RANGES[range_key]
     with _connect() as conn:
         mod = _ts_mod(conn)
-        total, total_d = _delta(conn, mod)
+        total, total_d = _delta(conn, mod, range_key)
         logins, logins_d = _delta(
-            conn, mod, "event_type IN ('login_failed','login_success')"
+            conn,
+            mod,
+            range_key,
+            "event_type IN ('login_failed','login_success')",
         )
+        window = _window_sql(mod, range_key)
         unique_ips = conn.execute(
-            "SELECT COUNT(DISTINCT src_ip) FROM attacks"
+            f"SELECT COUNT(DISTINCT src_ip) FROM attacks WHERE {window}"
         ).fetchone()[0]
-        # Unique IP 24h delta.
-        uniq_last = conn.execute(
-            f"SELECT COUNT(DISTINCT src_ip) FROM attacks "
-            f"WHERE datetime(timestamp{mod}) >= datetime('now','-1 day')"
-        ).fetchone()[0]
+        uniq_last = unique_ips
         uniq_prev = conn.execute(
             f"SELECT COUNT(DISTINCT src_ip) FROM attacks "
-            f"WHERE datetime(timestamp{mod}) >= datetime('now','-2 day') "
-            f"AND datetime(timestamp{mod}) < datetime('now','-1 day')"
+            f"WHERE datetime(timestamp{mod}) >= datetime('now','-{cfg['prev_start']}') "
+            f"AND datetime(timestamp{mod}) < datetime('now','-{cfg['prev_end']}')"
         ).fetchone()[0]
         uniq_d = (
             round((uniq_last - uniq_prev) / uniq_prev * 100, 1)
             if uniq_prev
             else (100.0 if uniq_last else 0.0)
         )
-        countries = len(_country_aggregate(conn))
+        countries = len(_country_aggregate(conn, range_key))
 
     return {
         "total_attacks": {"value": total, "delta_24h": total_d},
@@ -178,9 +248,9 @@ def get_summary() -> dict:
     }
 
 
-def get_top_countries(limit: int = 10) -> list[dict]:
+def get_top_countries(limit: int = 10, period: str = "24h") -> list[dict]:
     with _connect() as conn:
-        agg = _country_aggregate(conn)
+        agg = _country_aggregate(conn, normalize_range(period))
     top = agg[:limit]
     other = sum(e["count"] for e in agg[limit:])
     rows = [
@@ -194,9 +264,9 @@ def get_top_countries(limit: int = 10) -> list[dict]:
     return rows
 
 
-def get_geo() -> list[dict]:
+def get_geo(period: str = "24h") -> list[dict]:
     with _connect() as conn:
-        agg = _country_aggregate(conn)
+        agg = _country_aggregate(conn, normalize_range(period))
     return [
         {
             "name": e["name"],
@@ -211,27 +281,10 @@ def get_geo() -> list[dict]:
     ]
 
 
-def get_timeline(hours: int = 24) -> list[dict]:
-    """Attacks per hour over the most recent ``hours`` window.
-
-    The window is anchored to the latest event in the database (never earlier
-    than the real clock), so events whose timestamps run ahead of the server
-    clock (VPS timezone skew) are still shown instead of dropping to zero.
-    """
+def _timeline_hours(hours: int) -> list[dict]:
     with _connect() as conn:
         mod = _ts_mod(conn)
-        max_ts = conn.execute(
-            f"SELECT MAX(datetime(timestamp{mod})) FROM attacks"
-        ).fetchone()[0]
-
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        anchor = now
-        if max_ts:
-            try:
-                anchor = max(now, datetime.strptime(max_ts, "%Y-%m-%d %H:%M:%S"))
-            except ValueError:
-                pass
-        anchor = anchor.replace(minute=0, second=0, microsecond=0)
+        anchor = _anchor(conn, mod).replace(minute=0, second=0, microsecond=0)
         start = anchor - timedelta(hours=hours - 1)
         start_key = start.strftime("%Y-%m-%d %H:00")
 
@@ -252,10 +305,75 @@ def get_timeline(hours: int = 24) -> list[dict]:
     return out
 
 
-def get_event_types() -> list[dict]:
+def _timeline_days(days: int) -> list[dict]:
     with _connect() as conn:
+        mod = _ts_mod(conn)
+        anchor = _anchor(conn, mod).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        start = anchor - timedelta(days=days - 1)
+        start_key = start.strftime("%Y-%m-%d")
+
         rows = conn.execute(
-            "SELECT event_type, COUNT(*) AS c FROM attacks GROUP BY event_type"
+            f"SELECT strftime('%Y-%m-%d', timestamp{mod}) AS bucket, "
+            f"COUNT(*) AS c FROM attacks "
+            f"WHERE strftime('%Y-%m-%d', timestamp{mod}) >= ? "
+            f"GROUP BY bucket",
+            (start_key,),
+        ).fetchall()
+        counts = {r["bucket"]: r["c"] for r in rows}
+
+    out = []
+    for i in range(days):
+        b = start + timedelta(days=i)
+        key = b.strftime("%Y-%m-%d")
+        out.append({"label": b.strftime("%d %b"), "value": counts.get(key, 0)})
+    return out
+
+
+def _timeline_minutes(minutes: int) -> list[dict]:
+    with _connect() as conn:
+        mod = _ts_mod(conn)
+        anchor = _anchor(conn, mod).replace(second=0, microsecond=0)
+        start = anchor - timedelta(minutes=minutes - 1)
+        start_key = start.strftime("%Y-%m-%d %H:%M")
+
+        rows = conn.execute(
+            f"SELECT strftime('%Y-%m-%d %H:%M', timestamp{mod}) AS bucket, "
+            f"COUNT(*) AS c FROM attacks "
+            f"WHERE strftime('%Y-%m-%d %H:%M', timestamp{mod}) >= ? "
+            f"GROUP BY bucket",
+            (start_key,),
+        ).fetchall()
+        counts = {r["bucket"]: r["c"] for r in rows}
+
+    out = []
+    for i in range(minutes):
+        b = start + timedelta(minutes=i)
+        key = b.strftime("%Y-%m-%d %H:%M")
+        out.append({"label": b.strftime("%H:%M"), "value": counts.get(key, 0)})
+    return out
+
+
+def get_timeline(period: str = "24h") -> list[dict]:
+    """Attacks over time: per minute (1h), hourly (24h), or daily (week / month)."""
+    range_key = normalize_range(period)
+    cfg = _RANGES[range_key]
+    if "timeline_minutes" in cfg:
+        return _timeline_minutes(cfg["timeline_minutes"])
+    if "timeline_hours" in cfg:
+        return _timeline_hours(cfg["timeline_hours"])
+    return _timeline_days(cfg["timeline_days"])
+
+
+def get_event_types(period: str = "24h") -> list[dict]:
+    range_key = normalize_range(period)
+    with _connect() as conn:
+        mod = _ts_mod(conn)
+        window = _window_sql(mod, range_key)
+        rows = conn.execute(
+            f"SELECT event_type, COUNT(*) AS c FROM attacks "
+            f"WHERE {window} GROUP BY event_type"
         ).fetchall()
     total = sum(r["c"] for r in rows) or 1
     out = []
@@ -272,33 +390,37 @@ def get_event_types() -> list[dict]:
     return sorted(out, key=lambda e: e["value"], reverse=True)
 
 
-def _top_field(field: str, limit: int) -> list[dict]:
+def _top_field(field: str, limit: int, range_key: str) -> list[dict]:
     with _connect() as conn:
+        mod = _ts_mod(conn)
+        window = _window_sql(mod, range_key)
         rows = conn.execute(
             f"SELECT {field} AS label, COUNT(*) AS c FROM attacks "
-            f"WHERE {field} IS NOT NULL AND {field} <> '' "
+            f"WHERE {field} IS NOT NULL AND {field} <> '' AND {window} "
             f"GROUP BY {field} ORDER BY c DESC LIMIT ?",
             (limit,),
         ).fetchall()
     return [{"label": r["label"], "value": r["c"]} for r in rows]
 
 
-def get_top_usernames(limit: int = 8) -> list[dict]:
-    return _top_field("username", limit)
+def get_top_usernames(limit: int = 8, period: str = "24h") -> list[dict]:
+    return _top_field("username", limit, normalize_range(period))
 
 
-def get_top_passwords(limit: int = 8) -> list[dict]:
-    return _top_field("password", limit)
+def get_top_passwords(limit: int = 8, period: str = "24h") -> list[dict]:
+    return _top_field("password", limit, normalize_range(period))
 
 
-def get_heatmap() -> dict:
-    """Attacks by day-of-week x hour-of-day across all data."""
+def get_heatmap(period: str = "24h") -> dict:
+    """Attacks by day-of-week x hour-of-day in the selected window."""
+    range_key = normalize_range(period)
     with _connect() as conn:
         mod = _ts_mod(conn)
+        window = _window_sql(mod, range_key)
         rows = conn.execute(
             f"SELECT CAST(strftime('%w', timestamp{mod}) AS INTEGER) AS dow, "
             f"CAST(strftime('%H', timestamp{mod}) AS INTEGER) AS hour, "
-            f"COUNT(*) AS c FROM attacks GROUP BY dow, hour"
+            f"COUNT(*) AS c FROM attacks WHERE {window} GROUP BY dow, hour"
         ).fetchall()
     # strftime %w: 0=Sunday..6=Saturday -> remap to Mon..Sun index.
     remap = {0: 6, 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5}
@@ -312,13 +434,16 @@ def get_heatmap() -> dict:
     return {"days": _DAYS, "cells": cells}
 
 
-def get_recent(limit: int = 8) -> list[dict]:
+def get_recent(limit: int = 8, period: str = "24h") -> list[dict]:
+    range_key = normalize_range(period)
     with _connect() as conn:
         mod = _ts_mod(conn)
+        window = _window_sql(mod, range_key)
         rows = conn.execute(
             f"SELECT src_ip, event_type, "
             f"strftime('%H:%M:%S', timestamp{mod}) AS t "
-            f"FROM attacks ORDER BY datetime(timestamp{mod}) DESC LIMIT ?",
+            f"FROM attacks WHERE {window} "
+            f"ORDER BY datetime(timestamp{mod}) DESC LIMIT ?",
             (limit,),
         ).fetchall()
         geo = geoip.locate([r["src_ip"] for r in rows])

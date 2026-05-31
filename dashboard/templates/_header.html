@@ -1,13 +1,77 @@
 <header class="header">
   <h1 class="page-title">{% block page_title %}OVERVIEW{% endblock %}</h1>
   <div class="header-actions">
-    <button class="range-btn" type="button">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span>Last 24 hours</span>
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>
+    <div class="range-dropdown" id="time-range-dropdown">
+      <button
+        type="button"
+        class="range-btn"
+        id="time-range-toggle"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        aria-controls="time-range-menu"
+      >
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span id="time-range-label">
+          {% if time_range == '1h' %}1 godzina{% elif time_range == 'week' %}Tydzień{% elif time_range == 'month' %}Miesiąc{% else %}24h{% endif %}
+        </span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <ul class="range-menu" id="time-range-menu" role="listbox">
+        <li role="option" data-value="1h" {% if time_range|default('24h') == '1h' %}aria-selected="true"{% endif %}>1 godzina</li>
+        <li role="option" data-value="24h" {% if time_range|default('24h') == '24h' %}aria-selected="true"{% endif %}>24h</li>
+        <li role="option" data-value="week" {% if time_range|default('24h') == 'week' %}aria-selected="true"{% endif %}>Tydzień</li>
+        <li role="option" data-value="month" {% if time_range|default('24h') == 'month' %}aria-selected="true"{% endif %}>Miesiąc</li>
+      </ul>
+    </div>
     <button class="icon-btn" type="button" id="refresh-btn" title="Refresh">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
     </button>
   </div>
 </header>
+<script>
+(function () {
+  "use strict";
+  function initTimeRangeDropdown() {
+    var root = document.getElementById("time-range-dropdown");
+    var toggle = document.getElementById("time-range-toggle");
+    var menu = document.getElementById("time-range-menu");
+    if (!root || !toggle || !menu) return;
+
+    function setOpen(open) {
+      root.classList.toggle("is-open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    toggle.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(!root.classList.contains("is-open"));
+    });
+
+    menu.querySelectorAll("[data-value]").forEach(function (item) {
+      item.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var value = item.getAttribute("data-value");
+        var url = new URL(window.location.href);
+        if (url.searchParams.get("range") === value) {
+          setOpen(false);
+          return;
+        }
+        url.searchParams.set("range", value);
+        window.location.assign(url.toString());
+      });
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!root.contains(e.target)) setOpen(false);
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") setOpen(false);
+    });
+  }
+
+  initTimeRangeDropdown();
+})();
+</script>

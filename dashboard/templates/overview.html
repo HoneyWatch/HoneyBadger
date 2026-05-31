@@ -23,12 +23,12 @@
   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     {% if d >= 0 %}<polyline points="6 14 12 8 18 14"/>{% else %}<polyline points="6 10 12 16 18 10"/>{% endif %}
   </svg>
-  {{ '%+.1f'|format(d) }}% (24h)
+  {{ '%+.1f'|format(d) }}% ({{ range_delta_label|default('24h') }})
 </span>
 {% endmacro %}
 
 {% block content %}
-<section class="kpi-grid">
+<section id="section-overview" class="kpi-grid">
   <div class="card kpi">
     <div class="kpi-label">TOTAL ATTACKS</div>
     <div class="kpi-value">{{ '{:,}'.format(summary.total_attacks.value) }}</div>
@@ -51,7 +51,7 @@
   </div>
 </section>
 
-<section class="map-row">
+<section id="section-map" class="map-row">
   <div class="card map-card">
     <div class="card-head"><span class="card-title">ATTACKS BY LOCATION</span></div>
     <div id="map-info" class="map-info" aria-live="polite">Hover an attack source for details</div>
@@ -72,11 +72,11 @@
 </section>
 
 <section class="charts-row">
-  <div class="card">
+  <div id="section-statistics" class="card">
     <div class="card-head"><span class="card-title">ATTACKS OVER TIME</span></div>
     <div class="chart-box"><canvas id="timeline-chart"></canvas></div>
   </div>
-  <div class="card">
+  <div id="section-credentials" class="card">
     <div class="card-head"><span class="card-title">TOP USERNAMES</span></div>
     <div class="chart-box"><canvas id="usernames-chart"></canvas></div>
   </div>
@@ -87,7 +87,7 @@
 </section>
 
 <section class="bottom-row">
-  <div class="card">
+  <div id="section-attacks" class="card">
     <div class="card-head"><span class="card-title">ATTACKS TYPES</span></div>
     <div class="donut-wrap">
       <div class="donut-box"><canvas id="types-chart"></canvas></div>
@@ -98,7 +98,7 @@
     <div class="card-head"><span class="card-title">ATTACKS BY HOUR (HEATMAP)</span></div>
     <div id="heatmap" class="heatmap"></div>
   </div>
-  <div class="card">
+  <div id="section-logs" class="card">
     <div class="card-head"><span class="card-title">RECENT ATTACKS</span></div>
     <ul class="recent-list">
       {% for r in recent %}

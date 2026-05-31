@@ -12,7 +12,7 @@ if [[ ! -d "$APP_DIR/dashboard" ]]; then
 fi
 
 if [[ ! -f "$DB" ]]; then
-  echo "Warning: $DB not found. Dashboard will use mock data until the DB exists."
+  echo "Warning: $DB not found. Dashboard requires this database to serve data."
 fi
 
 apt-get update -qq

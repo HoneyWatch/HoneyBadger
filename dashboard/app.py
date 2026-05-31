@@ -1,72 +1,84 @@
 """HoneyWatch analytics dashboard (Flask).
 
-Serves the overview page and a set of JSON endpoints. The endpoints currently
-read from ``mock_data`` but are shaped to match the future parser/DB queries,
-so wiring in the real database later only requires swapping the data source.
+Serves the overview page and JSON API endpoints backed by ``honeywatch.db``.
 """
 from __future__ import annotations
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
-from . import data
+from . import db
 
 app = Flask(__name__)
 
 
+def _range() -> str:
+    return db.normalize_range(request.args.get("range"))
+
+
+@app.context_processor
+def _template_globals():
+    range_key = _range()
+    return {
+        "time_range": range_key,
+        "range_delta_label": db.range_delta_label(range_key),
+    }
+
+
 @app.route("/")
 def overview():
+    range_key = _range()
     return render_template(
         "overview.html",
-        summary=data.get_summary(),
-        top_countries=data.get_top_countries(),
-        recent=data.get_recent(),
+        summary=db.get_summary(period=range_key),
+        top_countries=db.get_top_countries(period=range_key),
+        recent=db.get_recent(period=range_key),
         active_page="overview",
     )
 
 
 @app.route("/api/summary")
 def api_summary():
-    return jsonify(data.get_summary())
+    return jsonify(db.get_summary(period=_range()))
 
 
 @app.route("/api/countries")
 def api_countries():
-    return jsonify(data.get_top_countries())
+    return jsonify(db.get_top_countries(period=_range()))
 
 
 @app.route("/api/geo")
 def api_geo():
-    return jsonify(data.get_geo())
+    return jsonify(db.get_geo(period=_range()))
 
 
 @app.route("/api/timeline")
 def api_timeline():
-    return jsonify(data.get_timeline())
+    return jsonify(db.get_timeline(period=_range()))
 
 
 @app.route("/api/event-types")
 def api_event_types():
-    return jsonify(data.get_event_types())
+    return jsonify(db.get_event_types(period=_range()))
 
 
 @app.route("/api/top-usernames")
 def api_top_usernames():
-    return jsonify(data.get_top_usernames())
+    return jsonify(db.get_top_usernames(period=_range()))
 
 
 @app.route("/api/top-passwords")
 def api_top_passwords():
-    return jsonify(data.get_top_passwords())
+    return jsonify(db.get_top_passwords(period=_range()))
 
 
 @app.route("/api/heatmap")
 def api_heatmap():
-    return jsonify(data.get_heatmap())
+    return jsonify(db.get_heatmap(period=_range()))
 
 
 @app.route("/api/recent")
 def api_recent():
-    return jsonify(data.get_recent())
+    return jsonify(db.get_recent(period=_range()))
 
 
 def main() -> None:

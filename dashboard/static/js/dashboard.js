@@ -1,4 +1,4 @@
-/* HoneyWatch dashboard front-end. Fetches mock JSON from the Flask API and
+/* HoneyWatch dashboard front-end. Fetches JSON from the Flask API and
    renders the interactive map, charts, and heatmap. */
 (function () {
   "use strict";
@@ -13,9 +13,24 @@
 
   const getJSON = (url) => fetch(url).then((r) => r.json());
 
-  Chart.defaults.color = COLORS.tick;
-  Chart.defaults.font.family = "Inter, Segoe UI, system-ui, sans-serif";
-  Chart.defaults.font.size = 11;
+  function currentRange() {
+    const menu = document.getElementById("time-range-menu");
+    if (!menu) return "24h";
+    const selected = menu.querySelector('[aria-selected="true"]');
+    return selected ? selected.dataset.value : "24h";
+  }
+
+  function apiUrl(path) {
+    const sep = path.includes("?") ? "&" : "?";
+    return `${path}${sep}range=${encodeURIComponent(currentRange())}`;
+  }
+
+  function applyChartDefaults() {
+    if (typeof Chart === "undefined") return;
+    Chart.defaults.color = COLORS.tick;
+    Chart.defaults.font.family = "Inter, Segoe UI, system-ui, sans-serif";
+    Chart.defaults.font.size = 11;
+  }
 
   /* ---------- Map (Leaflet — lightest fit for a VPS dashboard)
    *  ~40 KB lib via CDN; raster tiles from CARTO (not hosted on VPS).
@@ -154,7 +169,10 @@
         scales: {
           x: {
             grid: { display: false },
-            ticks: { maxTicksLimit: 7, color: COLORS.tick },
+            ticks: {
+              maxTicksLimit: data.length > 30 ? 12 : data.length > 14 ? 10 : 7,
+              color: COLORS.tick,
+            },
           },
           y: {
             grid: { color: COLORS.grid },
@@ -263,19 +281,77 @@
 
   /* ---------- Boot ---------- */
   function load() {
-    getJSON("/api/geo").then(initMap);
-    getJSON("/api/timeline").then(initTimeline);
-    getJSON("/api/top-usernames").then((d) =>
+    applyChartDefaults();
+    getJSON(apiUrl("/api/geo")).then(initMap);
+    getJSON(apiUrl("/api/timeline")).then(initTimeline);
+    getJSON(apiUrl("/api/top-usernames")).then((d) =>
       horizontalBars("usernames-chart", d, COLORS.accent)
     );
-    getJSON("/api/top-passwords").then((d) =>
+    getJSON(apiUrl("/api/top-passwords")).then((d) =>
       horizontalBars("passwords-chart", d, COLORS.red)
     );
-    getJSON("/api/event-types").then(initDonut);
-    getJSON("/api/heatmap").then(initHeatmap);
+    getJSON(apiUrl("/api/event-types")).then(initDonut);
+    getJSON(apiUrl("/api/heatmap")).then(initHeatmap);
   }
 
-  document.addEventListener("DOMContentLoaded", load);
+  function initSectionNav() {
+    const links = document.querySelectorAll(".nav-item[data-section]");
+    if (!links.length) return;
+
+    const setActive = (key) => {
+      links.forEach((link) => {
+        link.classList.toggle("active", link.dataset.section === key);
+      });
+    };
+
+    links.forEach((link) => {
+      link.addEventListener("click", (e) => {
+        const hash = link.getAttribute("href");
+        if (!hash || !hash.startsWith("#")) return;
+        const target = document.querySelector(hash);
+        if (!target) return;
+        e.preventDefault();
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        const qs = window.location.search;
+        history.replaceState(null, "", hash + qs);
+        setActive(link.dataset.section);
+      });
+    });
+
+    const sections = Array.from(links)
+      .map((link) => {
+        const el = document.querySelector(link.getAttribute("href"));
+        return el ? { key: link.dataset.section, el } : null;
+      })
+      .filter(Boolean);
+
+    if (sections.length && "IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((e) => e.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+          if (visible.length) {
+            const hit = sections.find((s) => s.el === visible[0].target);
+            if (hit) setActive(hit.key);
+          }
+        },
+        { rootMargin: "-20% 0px -55% 0px", threshold: [0.1, 0.25, 0.5] }
+      );
+      sections.forEach((s) => observer.observe(s.el));
+    }
+
+    const hash = window.location.hash;
+    if (hash) {
+      const match = Array.from(links).find((l) => l.getAttribute("href") === hash);
+      if (match) setActive(match.dataset.section);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    load();
+    initSectionNav();
+  });
 
   const refresh = document.getElementById("refresh-btn");
   if (refresh) refresh.addEventListener("click", () => window.location.reload());

@@ -1,12 +1,11 @@
+{# Single-page dashboard: each item scrolls to a section on Overview #}
 {% set nav_items = [
-  ("overview", "Overview", "grid"),
-  ("attacks", "Attacks", "alert"),
-  ("map", "Map", "map"),
-  ("statistics", "Statistics", "chart"),
-  ("logs", "Logs", "list"),
-  ("credentials", "Top Credentials", "key"),
-  ("hosts", "Hosts", "server"),
-  ("settings", "Settings", "gear"),
+  ("overview", "Overview", "grid", "section-overview"),
+  ("attacks", "Attacks", "alert", "section-attacks"),
+  ("map", "Map", "map", "section-map"),
+  ("statistics", "Statistics", "chart", "section-statistics"),
+  ("logs", "Logs", "list", "section-logs"),
+  ("credentials", "Top Credentials", "key", "section-credentials"),
 ] %}
 <aside class="sidebar">
   <div class="brand">
@@ -22,9 +21,13 @@
     </span>
   </div>
 
-  <nav class="nav">
-    {% for key, label, icon in nav_items %}
-    <a class="nav-item {{ 'active' if active_page == key else '' }}" href="#">
+  <nav class="nav" aria-label="Dashboard sections">
+    {% for key, label, icon, section_id in nav_items %}
+    <a
+      class="nav-item {{ 'active' if active_page == key else '' }}"
+      href="#{{ section_id }}"
+      data-section="{{ key }}"
+    >
       <span class="nav-icon">{% include "_icons.html" %}</span>
       <span class="nav-label">{{ label }}</span>
     </a>
