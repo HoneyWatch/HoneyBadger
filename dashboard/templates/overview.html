@@ -112,6 +112,38 @@
     </ul>
   </div>
 </section>
+
+<section class="logs-table-section">
+  <div id="section-logs-table" class="card">
+    <div class="card-head logs-table-head">
+      <span class="card-title">ATTACK LOGS</span>
+      <span id="logs-table-meta" class="logs-table-meta"></span>
+    </div>
+    <div class="logs-table-wrap">
+      <table class="logs-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>IP</th>
+            <th>Country</th>
+            <th>Type</th>
+            <th>Username</th>
+            <th>Password</th>
+            <th>Port</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="logs-table-body">
+          <tr><td colspan="8" class="logs-table-empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="logs-table-footer">
+      <button type="button" class="logs-page-btn" id="logs-prev" disabled>Previous</button>
+      <button type="button" class="logs-page-btn" id="logs-next">Next</button>
+    </div>
+  </div>
+</section>
 {% endblock %}
 
 {% block scripts %}

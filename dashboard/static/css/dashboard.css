@@ -135,8 +135,90 @@ html, body {
 #section-statistics,
 #section-credentials,
 #section-attacks,
-#section-logs {
+#section-logs,
+#section-logs-table {
   scroll-margin-top: 20px;
+}
+
+.logs-table-section { margin-top: 0; }
+.logs-table-head { flex-wrap: wrap; gap: 8px; }
+.logs-table-meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.logs-table-wrap {
+  overflow: auto;
+  max-height: 420px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.logs-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card-2);
+}
+.logs-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.logs-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+  vertical-align: middle;
+}
+.logs-table tbody tr:hover td { background: rgba(255, 255, 255, 0.02); }
+.logs-table tbody tr:last-child td { border-bottom: none; }
+.logs-table .col-ip,
+.logs-table .col-time { font-variant-numeric: tabular-nums; }
+.logs-table .col-user,
+.logs-table .col-pass {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+}
+.logs-table .col-type { color: var(--muted); white-space: nowrap; }
+.logs-table .col-country { white-space: nowrap; }
+.logs-table-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 24px !important;
+}
+.logs-table-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.logs-page-btn {
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.logs-page-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.logs-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .card {

@@ -461,3 +461,55 @@ def get_recent(limit: int = 8, period: str = "24h") -> list[dict]:
             }
         )
     return out
+
+
+def get_logs(
+    period: str = "24h", limit: int = 100, offset: int = 0
+) -> dict:
+    """Paginated attack log rows for the logs table."""
+    range_key = normalize_range(period)
+    limit = min(max(int(limit), 1), 500)
+    offset = max(int(offset), 0)
+
+    with _connect() as conn:
+        mod = _ts_mod(conn)
+        window = _window_sql(mod, range_key)
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM attacks WHERE {window}"
+        ).fetchone()[0]
+        rows = conn.execute(
+            f"SELECT id, timestamp, src_ip, src_port, username, password, "
+            f"event_type, source, "
+            f"strftime('%Y-%m-%d %H:%M:%S', timestamp{mod}) AS ts "
+            f"FROM attacks WHERE {window} "
+            f"ORDER BY datetime(timestamp{mod}) DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
+        geo = geoip.locate([r["src_ip"] for r in rows if r["src_ip"]])
+
+    items = []
+    for r in rows:
+        info = geo.get(r["src_ip"])
+        code = info["country_code"] if info else None
+        label = _EVENT_LABELS.get(r["event_type"], _DEFAULT_EVENT)[0]
+        items.append(
+            {
+                "id": r["id"],
+                "timestamp": r["ts"] or str(r["timestamp"] or ""),
+                "ip": r["src_ip"] or "—",
+                "port": r["src_port"],
+                "country": info["country"] if info else "—",
+                "flag": geoip.flag(code),
+                "type": label,
+                "username": r["username"] or "—",
+                "password": r["password"] or "—",
+                "source": r["source"] or "—",
+            }
+        )
+
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }

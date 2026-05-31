@@ -279,6 +279,88 @@
     container.innerHTML = html + axis;
   }
 
+  /* ---------- Logs table ---------- */
+  const LOGS_PAGE_SIZE = 100;
+  let logsOffset = 0;
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderLogsTable(data) {
+    const body = document.getElementById("logs-table-body");
+    const meta = document.getElementById("logs-table-meta");
+    const prevBtn = document.getElementById("logs-prev");
+    const nextBtn = document.getElementById("logs-next");
+    if (!body) return;
+
+    const { items, total, limit, offset } = data;
+    logsOffset = offset;
+
+    if (!items.length) {
+      body.innerHTML =
+        '<tr><td colspan="8" class="logs-table-empty">No logs in this time range</td></tr>';
+    } else {
+      body.innerHTML = items
+        .map(
+          (row) =>
+            "<tr>" +
+            `<td class="col-time">${escapeHtml(row.timestamp)}</td>` +
+            `<td class="col-ip">${escapeHtml(row.ip)}</td>` +
+            `<td class="col-country">${escapeHtml(row.flag)} ${escapeHtml(row.country)}</td>` +
+            `<td class="col-type">${escapeHtml(row.type)}</td>` +
+            `<td class="col-user" title="${escapeHtml(row.username)}">${escapeHtml(row.username)}</td>` +
+            `<td class="col-pass" title="${escapeHtml(row.password)}">${escapeHtml(row.password)}</td>` +
+            `<td>${row.port != null ? escapeHtml(row.port) : "—"}</td>` +
+            `<td>${escapeHtml(row.source)}</td>` +
+            "</tr>"
+        )
+        .join("");
+    }
+
+    if (meta) {
+      const from = total ? offset + 1 : 0;
+      const to = Math.min(offset + limit, total);
+      meta.textContent = `${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}`;
+    }
+    if (prevBtn) prevBtn.disabled = offset <= 0;
+    if (nextBtn) nextBtn.disabled = offset + limit >= total;
+  }
+
+  function loadLogsTable(offset) {
+    const url = `${apiUrl("/api/logs")}&limit=${LOGS_PAGE_SIZE}&offset=${offset}`;
+    return getJSON(url).then(renderLogsTable).catch(() => {
+      const body = document.getElementById("logs-table-body");
+      if (body) {
+        body.innerHTML =
+          '<tr><td colspan="8" class="logs-table-empty">Failed to load logs</td></tr>';
+      }
+    });
+  }
+
+  function initLogsTable() {
+    const prevBtn = document.getElementById("logs-prev");
+    const nextBtn = document.getElementById("logs-next");
+    if (!document.getElementById("logs-table-body")) return;
+
+    loadLogsTable(0);
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        if (logsOffset > 0) loadLogsTable(Math.max(0, logsOffset - LOGS_PAGE_SIZE));
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        loadLogsTable(logsOffset + LOGS_PAGE_SIZE);
+      });
+    }
+  }
+
   /* ---------- Boot ---------- */
   function load() {
     applyChartDefaults();
@@ -292,6 +374,7 @@
     );
     getJSON(apiUrl("/api/event-types")).then(initDonut);
     getJSON(apiUrl("/api/heatmap")).then(initHeatmap);
+    initLogsTable();
   }
 
   function initSectionNav() {

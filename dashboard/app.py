@@ -81,6 +81,13 @@ def api_recent():
     return jsonify(db.get_recent(period=_range()))
 
 
+@app.route("/api/logs")
+def api_logs():
+    limit = request.args.get("limit", 100, type=int)
+    offset = request.args.get("offset", 0, type=int)
+    return jsonify(db.get_logs(period=_range(), limit=limit, offset=offset))
+
+
 def main() -> None:
     import os
 
