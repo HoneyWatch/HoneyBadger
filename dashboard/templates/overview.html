@@ -38,7 +38,8 @@
 <section class="map-row">
   <div class="card map-card">
     <div class="card-head"><span class="card-title">ATTACKS BY LOCATION</span></div>
-    <div id="attack-map"></div>
+    <div id="map-info" class="map-info" aria-live="polite">Hover or click a country to see attack count</div>
+    <div id="attack-map" data-geo-url="{{ url_for('static', filename='data/world-countries.json') }}"></div>
   </div>
   <div class="card countries-card">
     <div class="card-head"><span class="card-title">TOP COUNTRIES</span></div>
