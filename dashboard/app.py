@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, render_template
 
-from . import mock_data
+from . import data
 
 app = Flask(__name__)
 
@@ -17,56 +17,56 @@ app = Flask(__name__)
 def overview():
     return render_template(
         "overview.html",
-        summary=mock_data.get_summary(),
-        top_countries=mock_data.get_top_countries(),
-        recent=mock_data.get_recent(),
+        summary=data.get_summary(),
+        top_countries=data.get_top_countries(),
+        recent=data.get_recent(),
         active_page="overview",
     )
 
 
 @app.route("/api/summary")
 def api_summary():
-    return jsonify(mock_data.get_summary())
+    return jsonify(data.get_summary())
 
 
 @app.route("/api/countries")
 def api_countries():
-    return jsonify(mock_data.get_top_countries())
+    return jsonify(data.get_top_countries())
 
 
 @app.route("/api/geo")
 def api_geo():
-    return jsonify(mock_data.get_geo())
+    return jsonify(data.get_geo())
 
 
 @app.route("/api/timeline")
 def api_timeline():
-    return jsonify(mock_data.get_timeline())
+    return jsonify(data.get_timeline())
 
 
 @app.route("/api/event-types")
 def api_event_types():
-    return jsonify(mock_data.get_event_types())
+    return jsonify(data.get_event_types())
 
 
 @app.route("/api/top-usernames")
 def api_top_usernames():
-    return jsonify(mock_data.get_top_usernames())
+    return jsonify(data.get_top_usernames())
 
 
 @app.route("/api/top-passwords")
 def api_top_passwords():
-    return jsonify(mock_data.get_top_passwords())
+    return jsonify(data.get_top_passwords())
 
 
 @app.route("/api/heatmap")
 def api_heatmap():
-    return jsonify(mock_data.get_heatmap())
+    return jsonify(data.get_heatmap())
 
 
 @app.route("/api/recent")
 def api_recent():
-    return jsonify(mock_data.get_recent())
+    return jsonify(data.get_recent())
 
 
 def main() -> None:
