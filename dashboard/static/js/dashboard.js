@@ -17,9 +17,11 @@
   Chart.defaults.font.family = "Inter, Segoe UI, system-ui, sans-serif";
   Chart.defaults.font.size = 11;
 
-  /* ---------- Map (Chart.js geo — lightweight bubble map, no tiles) ---------- */
-  let geoFeatures = null;
+  /* ---------- Map (Leaflet — lightest fit for a VPS dashboard)
+   *  ~40 KB lib via CDN; raster tiles from CARTO (not hosted on VPS).
+   *  OpenLayers / MapLibre are 5–10× heavier (WebGL + large bundles). ---------- */
   let attackMap = null;
+  let markerLayer = null;
 
   function setMapInfo(name, count) {
     const el = document.getElementById("map-info");
@@ -33,85 +35,93 @@
       `<span class="map-info-count">${count.toLocaleString()}</span> attack${count === 1 ? "" : "s"}`;
   }
 
-  function loadCountries() {
-    if (geoFeatures) return Promise.resolve(geoFeatures);
-    return getJSON("/static/vendor/countries-110m.json").then((topo) => {
-      geoFeatures = ChartGeo.topojson.feature(
-        topo,
-        topo.objects.countries
-      ).features;
-      return geoFeatures;
-    });
+  function markerRadius(count, min, max) {
+    const lo = 6;
+    const hi = 26;
+    if (max <= min) return (lo + hi) / 2;
+    return lo + ((count - min) / (max - min)) * (hi - lo);
   }
 
   function initMap(points) {
-    const canvas = document.getElementById("attack-map");
-    if (!canvas) return;
+    const el = document.getElementById("attack-map");
+    if (!el) return;
 
-    if (typeof ChartGeo === "undefined") {
-      const box = canvas.parentElement;
+    if (typeof L === "undefined") {
+      const box = el.parentElement;
       if (box) {
         box.innerHTML =
-          '<p class="map-error">Map plugin missing. Restart <code>python -m dashboard.app</code> and Ctrl+F5.</p>';
+          '<p class="map-error">Leaflet failed to load. Check your network and hard-refresh (Ctrl+F5).</p>';
       }
       return;
     }
 
     const valid = points.filter((p) => p.lat != null && p.lng != null);
+    if (!valid.length) {
+      setMapInfo(null, 0);
+      return;
+    }
 
-    loadCountries().then((countries) => {
-      if (attackMap) attackMap.destroy();
-      attackMap = new Chart(canvas.getContext("2d"), {
-        type: "bubbleMap",
-        data: {
-          labels: valid.map((p) => p.name),
-          datasets: [
-            {
-              outline: countries,
-              showOutline: true,
-              outlineBackgroundColor: "rgba(255,255,255,0.035)",
-              outlineBorderColor: "rgba(255,255,255,0.14)",
-              outlineBorderWidth: 0.5,
-              backgroundColor: "rgba(245,158,11,0.75)",
-              borderColor: "#fde68a",
-              borderWidth: 1,
-              hoverBackgroundColor: "#f59e0b",
-              data: valid.map((p) => ({
-                x: p.lng,
-                y: p.lat,
-                value: p.count,
-                name: p.name,
-              })),
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          onHover: (_evt, els) => {
-            if (els.length) {
-              const d = valid[els[0].index];
-              setMapInfo(d.name, d.count);
-            } else {
-              setMapInfo(null, 0);
-            }
-          },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (c) =>
-                  `${c.raw.name}: ${Number(c.raw.value).toLocaleString()} attacks`,
-              },
-            },
-          },
-          scales: {
-            projection: { axis: "x", projection: "equalEarth" },
-            size: { axis: "x", size: [4, 26] },
-          },
-        },
+    if (!attackMap) {
+      attackMap = L.map(el, {
+        center: [22, 12],
+        zoom: 2,
+        minZoom: 2,
+        maxZoom: 6,
+        worldCopyJump: true,
+        zoomControl: true,
+        attributionControl: true,
       });
+
+      // CARTO Dark Matter — matches dashboard theme; tiles offloaded from VPS.
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: "abcd",
+          maxZoom: 6,
+          detectRetina: false,
+          keepBuffer: 1,
+        }
+      ).addTo(attackMap);
+
+      markerLayer = L.layerGroup().addTo(attackMap);
+    } else {
+      markerLayer.clearLayers();
+    }
+
+    const counts = valid.map((p) => p.count);
+    const minC = Math.min(...counts);
+    const maxC = Math.max(...counts);
+
+    valid.forEach((p) => {
+      const r = markerRadius(p.count, minC, maxC);
+      const marker = L.circleMarker([p.lat, p.lng], {
+        radius: r,
+        fillColor: COLORS.accent,
+        color: "#fde68a",
+        weight: 1,
+        fillOpacity: 0.75,
+      });
+
+      marker.on("mouseover", () => setMapInfo(p.name, p.count));
+      marker.on("mouseout", () => setMapInfo(null, 0));
+      marker.bindTooltip(
+        `<strong>${p.name}</strong><br>${p.count.toLocaleString()} attacks`,
+        { direction: "top", offset: [0, -Math.round(r)] }
+      );
+
+      markerLayer.addLayer(marker);
     });
+
+    const bounds = L.latLngBounds(valid.map((p) => [p.lat, p.lng]));
+    if (valid.length === 1) {
+      attackMap.setView(bounds.getCenter(), 4);
+    } else {
+      attackMap.fitBounds(bounds.pad(0.3));
+    }
+
+    requestAnimationFrame(() => attackMap.invalidateSize());
   }
 
   /* ---------- Charts ---------- */
