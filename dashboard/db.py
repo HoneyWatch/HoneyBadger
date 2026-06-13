@@ -52,8 +52,41 @@ _EVENT_LABELS = {
     "login_failed": ("Failed Login", "#f59e0b"),
     "login_success": ("Successful Login", "#ea7c1f"),
     "command": ("Command Execution", "#7c2d12"),
+    "http_probe": ("HTTP Probe", "#2563eb"),
+    "ftp": ("FTP", "#16a34a"),
+    "mysql": ("MySQL", "#0891b2"),
+    "rdp": ("RDP", "#7c3aed"),
+    "git": ("Git", "#ca8a04"),
+    "mssql": ("MSSQL", "#db2777"),
+    "sip": ("SIP", "#059669"),
+    "vnc": ("VNC", "#dc2626"),
 }
-_DEFAULT_EVENT = ("Other", "#3b82f6")
+_DEFAULT_EVENT = ("Other", "#64748b")
+_PORT_COLORS = (
+    "#0d9488",
+    "#4f46e5",
+    "#e11d48",
+    "#65a30d",
+    "#d97706",
+    "#9333ea",
+    "#0284c7",
+    "#be123c",
+)
+
+
+def _resolve_event(event_type: str | None) -> tuple[str, str]:
+    """Map raw DB event_type to display label and chart colour."""
+    key = event_type or ""
+    if key in _EVENT_LABELS:
+        return _EVENT_LABELS[key]
+    if key.startswith("port_"):
+        port = key[5:]
+        try:
+            idx = int(port) % len(_PORT_COLORS)
+        except ValueError:
+            idx = sum(ord(c) for c in port) % len(_PORT_COLORS)
+        return (f"Port {port}", _PORT_COLORS[idx])
+    return _DEFAULT_EVENT
 
 _DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -376,15 +409,21 @@ def get_event_types(period: str = "24h") -> list[dict]:
             f"WHERE {window} GROUP BY event_type"
         ).fetchall()
     total = sum(r["c"] for r in rows) or 1
-    out = []
+    agg: dict[str, dict] = {}
     for r in rows:
-        label, color = _EVENT_LABELS.get(r["event_type"], _DEFAULT_EVENT)
+        label, color = _resolve_event(r["event_type"])
+        entry = agg.setdefault(
+            label, {"label": label, "color": color, "count": 0}
+        )
+        entry["count"] += r["c"]
+    out = []
+    for entry in agg.values():
         out.append(
             {
-                "label": label,
-                "value": round(r["c"] / total * 100, 1),
-                "count": r["c"],
-                "color": color,
+                "label": entry["label"],
+                "value": round(entry["count"] / total * 100, 1),
+                "count": entry["count"],
+                "color": entry["color"],
             }
         )
     return sorted(out, key=lambda e: e["value"], reverse=True)
@@ -451,7 +490,7 @@ def get_recent(limit: int = 8, period: str = "24h") -> list[dict]:
     for r in rows:
         info = geo.get(r["src_ip"])
         code = info["country_code"] if info else None
-        label = _EVENT_LABELS.get(r["event_type"], _DEFAULT_EVENT)[0]
+        label = _resolve_event(r["event_type"])[0]
         out.append(
             {
                 "ip": r["src_ip"],
@@ -491,7 +530,7 @@ def get_logs(
     for r in rows:
         info = geo.get(r["src_ip"])
         code = info["country_code"] if info else None
-        label = _EVENT_LABELS.get(r["event_type"], _DEFAULT_EVENT)[0]
+        label = _resolve_event(r["event_type"])[0]
         items.append(
             {
                 "id": r["id"],
